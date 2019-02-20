@@ -18,6 +18,11 @@
 #define GATEWAY 192,168,1,1
 #define SUBNET 255,255,255,0
 
+// Web Update Parameters
+#define WEB_UPDATE_ENABLED false
+#define WEB_UPDATE_USER "your-web-update-name"
+#define WEB_UPDATE_PASS "your-web-update-password"
+
 // MQTT Parameters
 
 #define MQTT_BROKER "w.x.y.z"
@@ -30,45 +35,7 @@
 // Relay Parameters
 
 #define ACTIVE_HIGH_RELAY true
-
-// Door 1 Parameters
-
-#define DOOR1_ALIAS "Garage Door 1"
-#define MQTT_DOOR1_ACTION_TOPIC "garage/door/1/action"
-#define MQTT_DOOR1_STATUS_TOPIC "garage/door/1/status"
-#define DOOR1_OPEN_PIN D2
-#define DOOR1_CLOSE_PIN D2
-#define DOOR1_STATUS_PIN D5
-#define DOOR1_STATUS_SWITCH_LOGIC "NO"
-
-// Door 2 Parameters
-
-#define DOOR2_ENABLED false
-#define DOOR2_ALIAS "Garage Door 2"
-#define MQTT_DOOR2_ACTION_TOPIC "garage/door/2/action"
-#define MQTT_DOOR2_STATUS_TOPIC "garage/door/2/status"
-#define DOOR2_OPEN_PIN D1
-#define DOOR2_CLOSE_PIN D1
-#define DOOR2_STATUS_PIN D6
-#define DOOR2_STATUS_SWITCH_LOGIC "NO"
-
-// Aux Door 1 Parameters
-
-#define AUX_DOOR1_ENABLED false
-#define AUX_DOOR1_ALIAS "Garage Aux Door 1"
-#define MQTT_AUX_DOOR1_ACTION_TOPIC "garage/aux_door/1/action"
-#define MQTT_AUX_DOOR1_STATUS_TOPIC "garage/aux_door/1/status"
-#define AUX_DOOR1_STATUS_PIN D3
-#define AUX_DOOR1_STATUS_SWITCH_LOGIC "NO"
-
-// Aux Door 2 Parameters
-
-#define AUX_DOOR2_ENABLED false
-#define AUX_DOOR2_ALIAS "Garage Aux Door 2"
-#define MQTT_AUX_DOOR2_ACTION_TOPIC "garage/aux_door/2/action"
-#define MQTT_AUX_DOOR2_STATUS_TOPIC "garage/aux_door/2/status"
-#define AUX_DOOR2_STATUS_PIN D4
-#define AUX_DOOR2_STATUS_SWITCH_LOGIC "NO"
+#define RELAY_ACTIVE_TIME 500
 
 // Temperature and Humidity Sensor Parameters
 
