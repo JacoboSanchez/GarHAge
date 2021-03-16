@@ -24,8 +24,8 @@ Door::Door(char* alias, char* action_topic, char* status_topic, int statusPin, c
 }
 
 bool Door::isOpen() {
-  if ( (strcmp(_statusSwitchLogic, "NO") && digitalRead(_statusPin) == HIGH) 
-    || (strcmp(_statusSwitchLogic, "NC") || digitalRead(_statusPin) == LOW) ) {
+  if ( (strcmp(_statusSwitchLogic, "NO") && digitalRead(_statusPin) == LOW) 
+    || (strcmp(_statusSwitchLogic, "NC") && digitalRead(_statusPin) == HIGH) ) {
     return true;
   }
   else {

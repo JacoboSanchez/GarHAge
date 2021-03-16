@@ -37,14 +37,3 @@
 #define ACTIVE_HIGH_RELAY true
 #define RELAY_ACTIVE_TIME 500
 
-// Temperature and Humidity Sensor Parameters
-
-#define DHT_ENABLED false
-#define DHTPIN D7
-#define DHTTYPE DHT11 // or: DHT21 or DHT22
-#define MQTT_TEMPERATURE_TOPIC "garage/temperature"
-#define MQTT_HUMIDITY_TOPIC "garage/humidity"
-#define DHT_PUBLISH_INTERVAL 300
-#define DHT_TEMPERATURE_CELSIUS true
-#define DHT_TEMPERATURE_ALIAS "Garage Temperature"
-#define DHT_HUMIDITY_ALIAS "Garage Humidity"

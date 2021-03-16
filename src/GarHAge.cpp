@@ -13,7 +13,6 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <ArduinoJson.h>
-#include <DHT.h>
 #include <Adafruit_Sensor.h>
 #include "config.h"
 #include "Door.h"
@@ -53,19 +52,12 @@ const bool activeHighRelay = ACTIVE_HIGH_RELAY;
 
 GarageDoor door1 = GarageDoor((char *)"GarDoor1", (char *)"garage/door/1/action", (char *)"garage/door/1/status", D2, D2, D5, (char *)"NO");
 GarageDoor door2 = GarageDoor((char *)"GarDoor2", (char *)"garage/door/2/action", (char *)"garage/door/2/status", D1, D1);
-Door door3 = Door((char *)"AuxDoor1", (char *)"garage/aux_door/1/action", (char *)"garage/aux_door/1/status", D3, (char *)"NO");
-Door door4 = Door((char *)"AuxDoor2", (char *)"garage/aux_door/2/action", (char *)"garage/aux_door/2/status", D4, (char *)"NO");
 
-Door * doors[] = { &door1, &door2, &door3, &door4 };
+Door * doors[] = { &door1, &door2 };
 
-const int numDoors = sizeof(doors)/4;
+const int numDoors = 2;
 
-const bool dht_enabled = DHT_ENABLED;
-const char* dhtTempTopic = MQTT_TEMPERATURE_TOPIC;
-const char* dhtHumTopic = MQTT_HUMIDITY_TOPIC;
 
-const unsigned long dht_publish_interval_s = DHT_PUBLISH_INTERVAL;
-unsigned long dht_lastReadTime = 0;
 const int relayActiveTime = RELAY_ACTIVE_TIME;
 const unsigned int deadTime = 4000;
 const String availabilityBase = MQTT_CLIENTID;
@@ -92,7 +84,6 @@ WiFiClient espClient;
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
 PubSubClient client(espClient);
-DHT dht(DHTPIN, DHTTYPE);
 
 // Wifi setup function
 
@@ -159,7 +150,6 @@ void publish_door_status(Door *door) {
       else 
         { stat = (char *)"OFF"; }
     }
-    
     Serial.print(door->getAlias());
     Serial.print(" ");
     Serial.print(stat);
@@ -206,60 +196,14 @@ void publish_enabled_doors() {
   }
 }
 
-// Function that runs in loop() to read and publish values from the DHT sensor
-
-void dht_read_publish() {
-  // Read values from sensor
-  float hum = dht.readHumidity();
-  float tempRaw = dht.readTemperature();
-
-  // Check if there was an error reading values
-  if (isnan(hum) || isnan(tempRaw)) {
-    Serial.print("Failed to read from DHT sensor; will try again in ");
-    Serial.print(dht_publish_interval_s);
-    Serial.println(" seconds...");
-    return;
-  }
-
-  bool celsius = DHT_TEMPERATURE_CELSIUS;
-  float temp;
-  if (celsius) {
-    temp = tempRaw;
-  }
-  else {
-    temp = (tempRaw * 1.8 + 32);
-  }
-
-  char payload[4];
-
-  // Publish the temperature payload via MQTT 
-  dtostrf(temp, 4, 0, payload);
-  Serial.print("Publishing DHT Temperature payload: ");
-  Serial.print(payload);
-  Serial.print(" to ");
-  Serial.print(dhtTempTopic);
-  Serial.println("...");
-  client.publish(dhtTempTopic, payload, false);
-
-  // Publish the humidity payload via MQTT
-  dtostrf(hum, 4, 0, payload);
-  Serial.print("Publishing DHT Humidity payload: ");
-  Serial.print(payload);
-  Serial.print(" to ");
-  Serial.print(dhtHumTopic);
-  Serial.println("...");
-  client.publish(dhtHumTopic, payload, false);
-
-}
-
 void publish_ha_mqtt_discovery_door(Door *door, const int doorNum){
   char* component;
   char* nodeName;
 
   const size_t bufferSize = JSON_OBJECT_SIZE(13);
-  DynamicJsonBuffer jsonBuffer(bufferSize);
+  DynamicJsonDocument jsonBuffer(bufferSize);
 
-  JsonObject& root = jsonBuffer.createObject();
+  JsonObject root = jsonBuffer.to<JsonObject>();
   root["name"] = door->getAlias();
   root["avty_t"] = availabilityTopic;
 
@@ -285,7 +229,7 @@ void publish_ha_mqtt_discovery_door(Door *door, const int doorNum){
 
   // Prepare payload for publishing
   String payloadStr = "";
-  root.printTo(payloadStr);
+  serializeJson(root, payloadStr);
   const char* payload = payloadStr.c_str();
 
   // Prepare topic for publishing
@@ -304,86 +248,11 @@ void publish_ha_mqtt_discovery_door(Door *door, const int doorNum){
   client.publish(topic, payload, true);
 }
 
-void publish_ha_mqtt_discovery_temperature() {
-  const size_t bufferSize = JSON_OBJECT_SIZE(7);
-  DynamicJsonBuffer jsonBuffer(bufferSize);
-
-  bool celsius = DHT_TEMPERATURE_CELSIUS;
-  String uom = "";
-  if (celsius) {
-    uom = "°C";
-  }
-  else {
-    uom = "°F";
-  }
-
-  String alias = DHT_TEMPERATURE_ALIAS;
-
-  JsonObject& root = jsonBuffer.createObject();
-  root["name"] = alias;
-  root["stat_t"] = dhtTempTopic;
-  root["unit_of_meas"] = uom;
-  root["avty_t"] = availabilityTopic;
-
-  // Prepare payload for publishing
-  String payloadStr = "";
-  root.printTo(payloadStr);
-  const char* payload = payloadStr.c_str();
-
-  // Prepare topic for publishing
-  String clientID = mqtt_clientId;
-  String suffix = "/temperature/config";
-  String topicStr = discoveryPrefix + "/sensor/" + clientID + suffix;
-  const char* topic = topicStr.c_str();
-
-  // Publish payload
-  Serial.print("Publishing MQTT Discovery payload for ");
-  Serial.print(alias);
-  Serial.println("...");
-  client.publish(topic, payload, false);
-
-}
-
-void publish_ha_mqtt_discovery_humidity() {
-  const size_t bufferSize = JSON_OBJECT_SIZE(7);
-  DynamicJsonBuffer jsonBuffer(bufferSize);
-
-  String alias = DHT_HUMIDITY_ALIAS;
-
-  JsonObject& root = jsonBuffer.createObject();
-  root["name"] = alias;
-  root["stat_t"] = dhtHumTopic;
-  root["unit_of_meas"] = "%";
-  root["avty_t"] = availabilityTopic;
-
-  // Prepare payload for publishing
-  String payloadStr = "";
-  root.printTo(payloadStr);
-  const char* payload = payloadStr.c_str();
-
-  // Prepare topic for publishing
-  String clientID = mqtt_clientId;
-  String suffix = "/humidity/config";
-  String topicStr = discoveryPrefix + "/sensor/" + clientID + suffix;
-  const char* topic = topicStr.c_str();
-
-  // Publish payload
-  Serial.print("Publishing MQTT Discovery payload for ");
-  Serial.print(alias);
-  Serial.println("...");
-  client.publish(topic, payload, false);
-
-}
 
 void publish_ha_mqtt_discovery() {
   Serial.println("Publishing Home Assistant MQTT Discovery payloads...");
   for (int i = 0; i < numDoors; i++) {
     publish_ha_mqtt_discovery_door(doors[i], i);
-  }
-
-  if (dht_enabled) {
-    publish_ha_mqtt_discovery_temperature();
-    publish_ha_mqtt_discovery_humidity();
   }
 }
 
@@ -392,29 +261,18 @@ void publish_ha_mqtt_discovery() {
 // Supported API calls:
 // STATE_ALL - publishes the current state of all enabled devices (including temp/humidity)
 // STATE_DOORS - publishes the current state of all doors only
-// STATE_DHT - forces a read/publish of temp/humidity
 // DISCOVERY - publishes HA discovery payloads for all enabled devices
 void processAPIMessage(String payload) {
   if (payload == "STATE_ALL") {
     Serial.println("API Request: STATE_ALL - Publishing state of all enabled devices...");
     publish_birth_message();
     publish_enabled_doors();
-    if (dht_enabled) { dht_read_publish(); }
   }
 
   else if (payload == "STATE_DOORS") {
     Serial.println("API Request: STATE_DOORS - Publishing state of all enabled doors...");
     publish_birth_message();
     publish_enabled_doors();
-  }
-
-  else if (payload == "STATE_DHT") {
-    if (dht_enabled) { 
-      Serial.println("API Request: STATE_DHT - Forcing Temperature and Humidity read/publish...");
-      publish_birth_message();
-      dht_read_publish(); 
-    }
-    else Serial.println("API Request ERROR: STATE_DHT requested but DHT is not enabled!");
   }
 
   else if (payload == "DISCOVERY") {
@@ -547,14 +405,6 @@ void print_device_status() {
     }
     else { Serial.println("Disabled"); }
   }
-
-  Serial.print("DHT Sensor     : ");
-  if (dht_enabled) {
-    Serial.println("Enabled");
-  }
-  else {
-    Serial.println("Disabled");
-  }
 }
 
 // Function that runs in loop() to connect/reconnect to the MQTT broker, and publish the current door statuses on connect
@@ -592,13 +442,6 @@ void reconnect() {
         // Publish the current door status on connect/reconnect to ensure status is synced with whatever happened while disconnected
         publish_door_status(doors[i]);
       }
-
-      // Publish the current temperature and humidity readings 
-      if (dht_enabled) {
-        dht_read_publish();
-        dht_lastReadTime = millis();
-      }
-
     } 
     else {
       Serial.print("failed, rc=");
@@ -611,8 +454,10 @@ void reconnect() {
 }
 
 void setup() {
+
   // Setup the output and input pins used in the sketch
   // Set the lastStatusValue variables to the state of the status pins at setup time
+
   for (int i = 0; i < numDoors; i++) {
     if (doors[i]->hasControl()) {
       const int openPin = doors[i]->getOpenPin();
@@ -631,15 +476,15 @@ void setup() {
     }
     if (doors[i]->statusEnabled()) {
       const int statusPin = doors[i]->getStatusPin();
-
       pinMode(statusPin, INPUT_PULLUP);
       doors[i]->setLastStatusValue(digitalRead(statusPin));
     }
   }
 
+
   // Setup serial output, connect to wifi, connect to MQTT broker, set MQTT message callback
   Serial.begin(115200);
-
+  
   Serial.println();
   Serial.print("Starting GarHAge...");
   Serial.println();
@@ -655,7 +500,6 @@ void setup() {
   }
 
   setup_ota();
-  if (dht_enabled) { dht.begin(); }
   client.setServer(mqtt_broker, 1883);
   client.setCallback(callback);
 }
@@ -687,15 +531,6 @@ void loop() {
           doors[i]->setLastSwitchTime(currentTime);
         }
       }
-    }
-  }
-
-  // Run DHT function to read/publish if enabled and interval is OK
-  if (dht_enabled) {
-    unsigned long currentTime = millis();
-    if (currentTime - dht_lastReadTime > (dht_publish_interval_s * 1000)) {
-      dht_read_publish();
-      dht_lastReadTime = millis();
     }
   }
   
